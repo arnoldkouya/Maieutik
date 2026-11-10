@@ -4,9 +4,9 @@ Maïeutik part d'un constat : un outil qui écrit le code à ta place te laisse 
 
 ## Principes
 
-**1. L'élève code, le professeur guide.** L'agent lit le projet, lance les tests, relit. Il n'a aucun outil pour modifier les fichiers de l'élève. Ce n'est pas une consigne de prompt que le modèle pourrait oublier : c'est une limite technique (voir `src/maieutik/agent.py`).
+**1. L'élève code, le professeur guide.** L'agent lit le projet, lance les tests, relit. Dans l'agent en terminal, il n'a aucun outil pour modifier les fichiers de l'élève : ce n'est pas une consigne que le modèle pourrait oublier, c'est une limite technique (voir `src/maieutik/agent.py`). Dans le skill, l'agent hôte garde ses outils d'écriture : la règle repose sur la consigne, ce qui est plus fragile et c'est dit dans le README.
 
-**2. L'aide se mérite par paliers.** Question ou indice, puis exemple partiel, puis solution expliquée. L'échelle est décrite dans `src/maieutik/prompts/help_ladder.md`. Rien n'est refusé définitivement : un élève qui a vraiment essayé finit par obtenir la solution, avec l'explication.
+**2. L'aide se mérite par paliers.** Question ou indice, puis exemple partiel, puis solution expliquée. L'échelle est décrite dans `skills/maieutik/references/pedagogie.md`. Rien n'est refusé définitivement : un élève qui a vraiment essayé finit par obtenir la solution, avec l'explication. Elle s'affiche dans la conversation, l'élève la tape lui-même.
 
 **3. Produire plutôt que lire.** Comprendre une explication donne l'illusion de savoir. L'agent fait produire : un test à faire passer, une sortie à prédire, un exercice à refaire dans un autre contexte.
 

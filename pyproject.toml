@@ -19,6 +19,10 @@ maieutik = "maieutik.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/maieutik"]
 
+# Le skill est la source unique de la méthode et des projets : on l'embarque tel quel.
+[tool.hatch.build.targets.wheel.force-include]
+"skills/maieutik" = "maieutik/_skill"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

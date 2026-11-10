@@ -1,0 +1,19 @@
+{
+  "name": "maieutik",
+  "owner": {
+    "name": "Arnold KOUYA",
+    "url": "https://github.com/arnoldkouya"
+  },
+  "metadata": {
+    "description": "Maïeutik : un professeur de code qui t'apprend en codant avec toi."
+  },
+  "plugins": [
+    {
+      "name": "maieutik",
+      "source": "./",
+      "description": "Un professeur de programmation qui t'apprend à coder en codant, sans coder à ta place.",
+      "version": "0.1.0",
+      "keywords": ["apprentissage", "pédagogie", "programmation", "mentor"]
+    }
+  ]
+}

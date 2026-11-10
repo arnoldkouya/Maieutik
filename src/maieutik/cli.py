@@ -9,8 +9,8 @@ import sys
 from pathlib import Path
 
 from . import progress as prog
+from .skill import skill_dir
 
-PROJECTS_DIR = Path(__file__).parent / "projects"
 DEFAULT_PROJECT = "todo-api"
 START_PROMPT = "[DÉBUT DE SESSION] Applique la procédure de début de session."
 
@@ -30,13 +30,17 @@ SLASH_PROMPTS = {
 }
 
 
+def projects_dir() -> Path:
+    return skill_dir() / "projects"
+
+
 def list_projects() -> list[str]:
-    return sorted(path.name for path in PROJECTS_DIR.iterdir() if path.is_dir())
+    return sorted(path.name for path in projects_dir().iterdir() if path.is_dir())
 
 
 def init_workspace(target: Path, project: str = DEFAULT_PROJECT) -> list[Path]:
     """Copie le projet fil rouge dans ``target`` sans jamais écraser un fichier existant."""
-    source = PROJECTS_DIR / project
+    source = projects_dir() / project
     if not source.is_dir():
         raise SystemExit(f"Projet inconnu : {project}. Disponibles : {', '.join(list_projects())}")
     target.mkdir(parents=True, exist_ok=True)

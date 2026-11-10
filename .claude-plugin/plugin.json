@@ -1,0 +1,12 @@
+{
+  "name": "maieutik",
+  "version": "0.1.0",
+  "description": "Un professeur de programmation qui t'apprend à coder en codant, sans coder à ta place : échelle d'aide, exécution des tests, relecture de mentor et suivi de progression.",
+  "author": {
+    "name": "Arnold KOUYA",
+    "url": "https://github.com/arnoldkouya"
+  },
+  "homepage": "https://github.com/arnoldkouya/maieutik",
+  "repository": "https://github.com/arnoldkouya/maieutik",
+  "keywords": ["apprentissage", "pédagogie", "programmation", "mentor", "tutorat", "skill"]
+}

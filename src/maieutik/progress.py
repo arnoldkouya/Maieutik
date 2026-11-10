@@ -9,8 +9,10 @@ Barreaux d'aide (voir prompts/help_ladder.md) :
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -204,3 +206,67 @@ def summary(data: dict[str, Any]) -> str:
         for item in errors:
             lines.append(f"- {item['text']} (x{item['count']})")
     return "\n".join(lines)
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="progress.py",
+        description="Suivi de progression Maïeutik (.maieutik/progress.json).",
+    )
+    parser.add_argument(
+        "--dir", default=".", help="dossier de travail de l'élève (défaut : dossier courant)"
+    )
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    commands.add_parser("show", help="affiche la progression")
+
+    record = commands.add_parser("record", help="enregistre un essai sur un concept")
+    record.add_argument("concept")
+    record.add_argument("outcome", choices=OUTCOMES)
+    record.add_argument(
+        "--barreau", type=int, default=0, help="barreau d'aide le plus haut utilisé (0 à 3)"
+    )
+    record.add_argument("--note", default="")
+
+    error = commands.add_parser("error", help="note une erreur récurrente")
+    error.add_argument("description")
+
+    profile = commands.add_parser("profile", help="met à jour le niveau, le jalon ou le projet")
+    profile.add_argument("--level")
+    profile.add_argument("--milestone", type=int)
+    profile.add_argument("--project")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Interface en ligne de commande, utilisée par le skill sans le SDK."""
+    args = _build_parser().parse_args(argv)
+    workspace = Path(args.dir)
+    if not workspace.is_dir():
+        print(f"Erreur : dossier introuvable : {workspace}", file=sys.stderr)
+        return 1
+    try:
+        data = load(workspace)
+        if args.command == "show":
+            print(summary(data))
+            return 0
+        if args.command == "record":
+            status = record_concept(data, args.concept, args.outcome, args.barreau, args.note)
+            message = f"Enregistré : « {args.concept.strip()} » → {STATUS_LABELS[status]}."
+        elif args.command == "error":
+            message = f"Erreur notée (vue {record_error(data, args.description)} fois)."
+        else:
+            if args.level is None and args.milestone is None and args.project is None:
+                raise ProgressError("Rien à mettre à jour : précise --level, --milestone ou --project.")
+            update_profile(data, args.level, args.milestone, args.project)
+            message = "Profil mis à jour."
+        save(workspace, data)
+    except ProgressError as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    print(message)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
