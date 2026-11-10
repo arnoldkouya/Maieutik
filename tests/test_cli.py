@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from maieutik import cli, tools as tl
@@ -91,4 +93,40 @@ def test_progress_command_prints_summary(tmp_path, capsys):
 
 def test_progress_command_rejects_missing_directory(tmp_path, capsys):
     assert cli.main(["progress", str(tmp_path / "absent")]) == 1
+    assert "introuvable" in capsys.readouterr().err
+
+
+# --- modes, audit et journal -------------------------------------------------------
+
+
+def test_audit_and_mode_commands_are_translated():
+    assert cli.translate_input("/audit").startswith("[AUDIT]")
+    assert "Sécurité" in cli.translate_input("/audit")
+    assert set(cli.MODE_MESSAGES) == {"apprendre", "ensemble"}
+    assert cli.MODE_MESSAGES["apprendre"].startswith("[MODE APPRENDRE]")
+    assert cli.MODE_MESSAGES["ensemble"].startswith("[MODE ENSEMBLE]")
+
+
+def test_every_command_listed_in_the_help_is_handled():
+    listed = set(re.findall(r"^  (/\w+)", cli.CHAT_HELP, re.MULTILINE))
+    handled = set(cli.SLASH_PROMPTS) | {
+        "/explique", "/apprendre", "/ensemble", "/progres", "/journal", "/aide", "/quit",
+    }
+
+    assert listed
+    assert listed <= handled
+
+
+def test_journal_command_before_and_after_a_change(tmp_path, capsys):
+    assert cli.main(["journal", str(tmp_path)]) == 0
+    assert "Journal vide" in capsys.readouterr().out
+
+    prog.add_journal_entry(tmp_path, "Ajout de la connexion", ["auth.py"], "hachage", "clé dans .env")
+
+    assert cli.main(["journal", str(tmp_path)]) == 0
+    assert "Ajout de la connexion" in capsys.readouterr().out
+
+
+def test_journal_command_rejects_missing_directory(tmp_path, capsys):
+    assert cli.main(["journal", str(tmp_path / "absent")]) == 1
     assert "introuvable" in capsys.readouterr().err

@@ -5,14 +5,14 @@
     "url": "https://github.com/arnoldkouya"
   },
   "metadata": {
-    "description": "Maïeutik : un professeur de code qui t'apprend en codant avec toi."
+    "description": "Code avec toi, explique chaque modification en langage simple et rend visibles les risques de sécurité (mode apprendre sur demande)."
   },
   "plugins": [
     {
       "name": "maieutik",
       "source": "./",
-      "description": "Un professeur de programmation qui t'apprend à coder en codant, sans coder à ta place.",
-      "version": "0.1.0",
+      "description": "Code avec toi, explique chaque modification en langage simple et rend visibles les risques de sécurité (mode apprendre sur demande).",
+      "version": "0.2.0",
       "keywords": ["apprentissage", "pédagogie", "programmation", "mentor"]
     }
   ]

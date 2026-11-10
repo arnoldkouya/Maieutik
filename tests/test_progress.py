@@ -141,3 +141,96 @@ def test_summary_mentions_status_and_errors():
 
 def test_summary_of_a_first_session():
     assert "première session" in prog.summary(prog.empty_progress())
+
+
+# --- concepts « vus » (expliqués, pas encore testés) -----------------------------
+
+
+def seen():
+    return {"outcome": "seen", "help_level": 0}
+
+
+def test_an_explained_concept_is_seen_not_learning():
+    assert prog.concept_status([seen()]) == "seen"
+
+
+def test_explaining_again_never_changes_a_status_set_by_attempts():
+    assert prog.concept_status([solved(0), solved(1), seen()]) == "mastered"
+    assert prog.concept_status([stuck(), seen()]) == "shaky"
+    assert prog.concept_status([seen(), solved(0)]) == "learning"
+
+
+def test_recording_seen_twice_in_a_row_adds_one_history_entry():
+    data = prog.empty_progress()
+
+    prog.record_concept(data, "authentification", "seen")
+    status = prog.record_concept(data, "authentification", "seen", note="expliqué avec une analogie")
+
+    entry = data["concepts"]["authentification"]
+    assert status == "seen"
+    assert len(entry["history"]) == 1
+    assert entry["note"] == "expliqué avec une analogie"
+
+
+def test_seen_does_not_push_a_stuck_attempt_out_of_the_history():
+    data = prog.empty_progress()
+    prog.record_concept(data, "sessions", "stuck", 3)
+    for _ in range(prog.MAX_HISTORY + 3):
+        prog.record_concept(data, "sessions", "seen")
+        prog.record_concept(data, "sessions", "solved", 0)
+        prog.record_concept(data, "sessions", "stuck", 3)
+
+    assert data["concepts"]["sessions"]["status"] == "shaky"
+
+
+def test_summary_of_a_seen_concept_has_no_help_level():
+    data = prog.empty_progress()
+    prog.record_concept(data, "sessions", "seen")
+
+    line = [item for item in prog.summary(data).splitlines() if "sessions" in item][0]
+
+    assert line == "- sessions : vu"
+
+
+# --- journal des changements ------------------------------------------------------
+
+
+def test_journal_is_created_with_a_title_and_one_entry(tmp_path):
+    path = prog.add_journal_entry(
+        tmp_path, "Ajout de la connexion", ["auth.py", "routes.py"], "mots de passe hachés", "clé dans .env"
+    )
+
+    text = path.read_text(encoding="utf-8")
+    assert path == prog.journal_path(tmp_path)
+    assert text.startswith("# Journal des changements\n")
+    assert "Ajout de la connexion" in text
+    assert "- **Fichiers** : `auth.py`, `routes.py`" in text
+    assert "- **Pourquoi** : mots de passe hachés" in text
+    assert "- **À vérifier** : clé dans .env" in text
+
+
+def test_journal_entries_are_appended_never_overwritten(tmp_path):
+    prog.add_journal_entry(tmp_path, "Première demande")
+    prog.add_journal_entry(tmp_path, "Deuxième demande", risks="rien")
+
+    text = prog.journal_path(tmp_path).read_text(encoding="utf-8")
+
+    assert text.count("# Journal des changements") == 1
+    assert text.index("Première demande") < text.index("Deuxième demande")
+    assert "rien de particulier signalé" in text
+
+
+def test_journal_flattens_multiline_fields_to_keep_its_structure(tmp_path):
+    prog.add_journal_entry(tmp_path, "Demande\n## faux titre", ["a.py\n- piège"], "ligne 1\nligne 2", "r1\n\nr2")
+
+    text = prog.journal_path(tmp_path).read_text(encoding="utf-8")
+
+    assert text.count("\n## ") == 1
+    assert "- **Pourquoi** : ligne 1 ligne 2" in text
+    assert "- **À vérifier** : r1 r2" in text
+
+
+def test_journal_requires_a_request(tmp_path):
+    with pytest.raises(prog.ProgressError):
+        prog.add_journal_entry(tmp_path, "  \n ")
+    assert not prog.journal_path(tmp_path).exists()

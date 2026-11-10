@@ -22,10 +22,12 @@ PROGRESS_DIR = ".maieutik"
 PROGRESS_FILE = "progress.json"
 MAX_HISTORY = 5
 MAX_ERRORS = 20
-OUTCOMES = ("solved", "stuck")
+OUTCOMES = ("solved", "stuck", "seen")
 HELP_LEVELS = (0, 1, 2, 3)
+JOURNAL_FILE = "JOURNAL.md"
 STATUS_LABELS = {
     "new": "nouveau",
+    "seen": "vu",
     "learning": "en cours",
     "shaky": "fragile",
     "mastered": "acquis",
@@ -95,16 +97,22 @@ def save(workspace: Path | str, data: dict[str, Any]) -> None:
 def concept_status(history: list[dict[str, Any]]) -> str:
     """Déduit le statut d'un concept de ses derniers essais.
 
+    - vu : expliqué à l'élève, jamais encore vérifié par un essai
     - acquis : les deux derniers essais réussis avec au plus un indice
     - fragile : dernier essai bloqué, ou réussi seulement avec la solution
     - en cours : le reste
+
+    Une simple explication (« seen ») ne change jamais un statut déjà établi par des essais.
     """
     if not history:
         return "new"
-    last = history[-1]
+    tested = [item for item in history if item["outcome"] != "seen"]
+    if not tested:
+        return "seen"
+    last = tested[-1]
     if last["outcome"] == "stuck" or last["help_level"] >= 3:
         return "shaky"
-    recent = history[-2:]
+    recent = tested[-2:]
     if len(recent) == 2 and all(
         item["outcome"] == "solved" and item["help_level"] <= 1 for item in recent
     ):
@@ -139,8 +147,10 @@ def record_concept(
     concepts = data.setdefault("concepts", {})
     key = _find_key(concepts, concept) or concept
     entry = concepts.setdefault(key, {"history": [], "status": "new"})
-    entry["history"].append({"outcome": outcome, "help_level": help_level, "at": _now()})
-    entry["history"] = entry["history"][-MAX_HISTORY:]
+    already_seen = outcome == "seen" and entry["history"] and entry["history"][-1]["outcome"] == "seen"
+    if not already_seen:
+        entry["history"].append({"outcome": outcome, "help_level": help_level, "at": _now()})
+        entry["history"] = entry["history"][-MAX_HISTORY:]
     if note and note.strip():
         entry["note"] = note.strip()
     entry["status"] = concept_status(entry["history"])
@@ -196,7 +206,8 @@ def summary(data: dict[str, Any]) -> str:
         for name, entry in sorted(concepts.items()):
             label = STATUS_LABELS.get(entry.get("status", "new"), "nouveau")
             history = entry.get("history") or []
-            extra = f" (dernière aide : barreau {history[-1]['help_level']})" if history else ""
+            tested = [item for item in history if item["outcome"] != "seen"]
+            extra = f" (dernière aide : barreau {tested[-1]['help_level']})" if tested else ""
             lines.append(f"- {name} : {label}{extra}")
     else:
         lines.append("Concepts : aucun suivi pour l'instant (première session).")
@@ -206,6 +217,48 @@ def summary(data: dict[str, Any]) -> str:
         for item in errors:
             lines.append(f"- {item['text']} (x{item['count']})")
     return "\n".join(lines)
+
+
+def _one_line(text: str) -> str:
+    """Aplatit un texte sur une ligne pour ne pas casser la structure du journal."""
+    return " ".join((text or "").split())
+
+
+def journal_path(workspace: Path | str) -> Path:
+    return Path(workspace) / PROGRESS_DIR / JOURNAL_FILE
+
+
+def add_journal_entry(
+    workspace: Path | str,
+    request: str,
+    files: list[str] | None = None,
+    why: str = "",
+    risks: str = "",
+) -> Path:
+    """Ajoute une entrée au journal des changements (``.maieutik/JOURNAL.md``).
+
+    Le journal garde une trace lisible de ce qui a été fait, pourquoi, et ce qui reste
+    à vérifier. Il s'écrit à la suite : une entrée n'en écrase jamais une autre.
+    """
+    request = _one_line(request)
+    if not request:
+        raise ProgressError("La demande est vide : que s'est-il passé ?")
+    path = journal_path(workspace)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = []
+    if not path.exists() or path.stat().st_size == 0:
+        lines.append("# Journal des changements\n")
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    lines.append(f"\n## {stamp} — {request}\n")
+    cleaned = [_one_line(name) for name in (files or []) if _one_line(name)]
+    if cleaned:
+        lines.append("- **Fichiers** : " + ", ".join(f"`{name}`" for name in cleaned))
+    if _one_line(why):
+        lines.append(f"- **Pourquoi** : {_one_line(why)}")
+    lines.append(f"- **À vérifier** : {_one_line(risks) or 'rien de particulier signalé'}")
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("\n".join(lines) + "\n")
+    return path
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -231,6 +284,12 @@ def _build_parser() -> argparse.ArgumentParser:
     error = commands.add_parser("error", help="note une erreur récurrente")
     error.add_argument("description")
 
+    journal = commands.add_parser("journal", help="ajoute une entrée au journal des changements")
+    journal.add_argument("request", help="ce que l'utilisateur a demandé")
+    journal.add_argument("--fichiers", nargs="*", default=[], help="fichiers créés ou modifiés")
+    journal.add_argument("--pourquoi", default="", help="pourquoi ce choix")
+    journal.add_argument("--risque", default="", help="ce qu'il reste à vérifier")
+
     profile = commands.add_parser("profile", help="met à jour le niveau, le jalon ou le projet")
     profile.add_argument("--level")
     profile.add_argument("--milestone", type=int)
@@ -255,6 +314,10 @@ def main(argv: list[str] | None = None) -> int:
             message = f"Enregistré : « {args.concept.strip()} » → {STATUS_LABELS[status]}."
         elif args.command == "error":
             message = f"Erreur notée (vue {record_error(data, args.description)} fois)."
+        elif args.command == "journal":
+            add_journal_entry(workspace, args.request, args.fichiers, args.pourquoi, args.risque)
+            print(f"Journal mis à jour : {PROGRESS_DIR}/{JOURNAL_FILE}")
+            return 0
         else:
             if args.level is None and args.milestone is None and args.project is None:
                 raise ProgressError("Rien à mettre à jour : précise --level, --milestone ou --project.")

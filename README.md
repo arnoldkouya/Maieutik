@@ -1,21 +1,38 @@
 # Maïeutik
 
-Un professeur de code qui t'apprend à coder **en codant avec toi**, sans coder à ta place.
+Un agent qui **code avec toi et t'explique chaque modification**, en rendant visibles les risques de sécurité.
 
-Tu construis un vrai projet. Maïeutik lit ton code, lance tes tests, te pose les bonnes questions et ne te donne la solution qu'en dernier recours. Il retient ce que tu maîtrises et ce qui reste fragile.
+Le vibe coding permet à des non-codeurs de construire de vrais produits avec une IA. Le risque : livrer du code qu'on ne comprend pas, avec des failles qu'on ne voit pas. Maïeutik travaille sur **ton projet** : tu demandes (« ajoute la connexion utilisateur »), il code, puis il dit en langage simple ce qu'il a fait, pourquoi, et ce qu'il faut vérifier côté sécurité.
 
-Il existe sous deux formes qui partagent la même méthode :
+Après chaque changement :
 
-| Forme | Pour qui | Garantie « il ne code pas à ma place » |
+- **Ce que j'ai fait** et **Pourquoi** : court, avec des analogies, sans jargon non expliqué (« explique plus » pour creuser) ;
+- **À vérifier** : les risques classés *à corriger avant de publier*, *à surveiller*, *bonne pratique* ;
+- une ligne dans le **journal des changements** (`.maieutik/JOURNAL.md`).
+
+Deux modes :
+
+| Mode | Principe |
+|---|---|
+| **Coder ensemble** (défaut) | tu demandes, l'agent code et explique chaque modification |
+| **Apprendre** (sur demande) | tu codes, l'agent te guide avec une échelle d'aide (indice, exemple partiel, solution) et ne touche à rien |
+
+> État : version 0.2. Skill en français, agent en terminal en Python.
+
+## Ce que Maïeutik n'est pas
+
+Un outil qui explique son propre code n'est **pas un audit**. L'agent peut se tromper ou passer à côté d'une faille. Il ne dit jamais « c'est sécurisé ». Avant de publier quelque chose de sensible (paiements, données personnelles), fais relire par une personne compétente.
+
+## Formes disponibles
+
+| Forme | Pour qui | Mode apprendre : « il ne touche à rien » |
 |---|---|---|
-| **Skill** (Claude Code, Codex, claude.ai, Desktop) | tu utilises déjà un agent de code et tu veux qu'il devienne ton prof | une consigne : l'agent s'engage à ne pas écrire ton code, mais il en a techniquement les moyens |
-| **Agent en terminal** (`maieutik chat`) | tu veux un prof dédié | une limite technique : l'agent n'a ni `Write`, ni `Edit`, ni `Bash` |
-
-> État : MVP. Skill en français, agent en terminal en Python.
+| **Skill** (Claude Code, Codex, claude.ai, Desktop) | tu as déjà un agent de code | une consigne : l'agent s'engage, mais garde ses outils d'écriture |
+| **Agent en terminal** (`maieutik chat`) | tu veux un agent dédié | une limite technique : en mode apprendre, les outils d'écriture refusent |
 
 ## Installer le skill
 
-Le skill suit le format ouvert Agent Skills : un dossier avec un fichier `SKILL.md`. Il est dans [`skills/maieutik/`](skills/maieutik/).
+Le skill suit le format ouvert Agent Skills. Il est dans [`skills/maieutik/`](skills/maieutik/).
 
 ```bash
 git clone https://github.com/arnoldkouya/maieutik.git
@@ -24,26 +41,33 @@ cd maieutik
 
 | Plateforme | Méthode |
 |---|---|
-| Claude Code | Plugin ou script (voir ci-dessous) |
-| Claude (claude.ai, Desktop) | Importer `dist/maieutik-skill.zip` dans les réglages des skills |
-| Codex | Script d'installation ou copie dans `~/.agents/skills/maieutik` |
-| Autre agent compatible Agent Skills | Copier `skills/maieutik/` dans le dossier de skills de l'agent |
+| Claude Code | Plugin ou script |
+| Codex | Script, ou copie dans `~/.agents/skills/maieutik` |
+| Claude (claude.ai, Desktop) | Importer `dist/maieutik-skill.zip` |
+| Autre agent compatible | Copier `skills/maieutik/` dans son dossier de skills |
 
 ### Claude Code
-
-Par le plugin :
 
 ```text
 /plugin marketplace add arnoldkouya/maieutik
 /plugin install maieutik@maieutik
 ```
 
-Ou par le script, qui copie le skill dans `~/.claude/skills/maieutik` :
+Ou par le script :
 
 ```bash
-scripts/install.sh claude            # pour tous vos projets
-scripts/install.sh claude --project  # pour le projet courant (.claude/skills)
+scripts/install.sh claude            # pour tous tes projets
+scripts/install.sh claude --project  # pour le projet courant
 ```
+
+### Codex
+
+```bash
+scripts/install.sh codex            # ~/.agents/skills
+scripts/install.sh codex --project  # .agents/skills du projet courant
+```
+
+Windows : `scripts\install.ps1 -Target codex` (ou `claude`, `all`; `-Project`, `-SansAudit`). Le script PowerShell n'a pas été testé sur Windows.
 
 ### Claude (claude.ai, Desktop)
 
@@ -51,73 +75,66 @@ scripts/install.sh claude --project  # pour le projet courant (.claude/skills)
 python3 scripts/build_zips.py
 ```
 
-Puis, dans les réglages de Claude, section des capacités ou des skills, importer `dist/maieutik-skill.zip` (le dossier `maieutik/` est à la racine de l'archive). L'intitulé exact du menu varie selon la version de l'application.
+Importer ensuite `dist/maieutik-skill.zip` dans les réglages des skills. Le skill d'audit de Cloudflare (ci-dessous) est à importer séparément.
 
-### Codex
+### Le skill d'audit de sécurité de Cloudflare
 
-```bash
-scripts/install.sh codex            # ~/.agents/skills/maieutik
-scripts/install.sh codex --project  # .agents/skills du projet courant
-```
+Les scripts d'installation ajoutent aussi le skill [`security-audit`](https://github.com/cloudflare/security-audit-skill) de Cloudflare (licence MIT), à côté de Maïeutik. Maïeutik lui délègue la commande « audite mon projet » et traduit ses résultats en langage simple.
 
-Sous Windows, utiliser `scripts\install.ps1 -Target codex` (ou `claude`, `all`, avec `-Project` pour le projet courant). Dans Codex, le skill s'active seul selon sa description, ou en le nommant : `$maieutik`.
+- Il est **téléchargé à l'installation, figé sur un commit précis** (pas la dernière version de la branche) : le code installé est celui qui a été relu. Il n'est pas copié dans ce dépôt.
+- Il faut `git` et un accès à GitHub. En cas d'échec, Maïeutik s'installe quand même et un avertissement indique la commande pour l'ajouter plus tard.
+- Un audit complet est **long et coûteux** (nombreux sous-agents) : Maïeutik demande confirmation et propose le profil `quick`.
+- `--sans-audit` (`-SansAudit` sous Windows) ne l'installe pas.
 
 ### Utiliser le skill
 
-Dans ton dossier de projet, dis par exemple :
+Dans ton projet, dis par exemple :
 
-- « Apprends-moi à écrire une API, guide-moi sans me donner la réponse. »
-- « Sois mon prof : je veux comprendre pourquoi ce test échoue. »
-- « Relis mon code comme un mentor. »
+- « Ajoute la connexion utilisateur et explique-moi ce que tu fais. »
+- « Audite mon projet. »
+- « Passe en mode apprendre : je veux écrire cette fonction moi-même. »
 
-L'agent reste en mode professeur jusqu'à ce que tu dises « stop » ou « mode normal ». Sa progression est notée dans `.maieutik/progress.json`, dans ton dossier de projet.
+Le suivi est dans `.maieutik/` : `progress.json` (progression, personnel) et `JOURNAL.md` (journal des changements, que tu peux versionner). Pense à ajouter `.maieutik/progress.json` à ton `.gitignore`.
 
 ## Utiliser l'agent en terminal
 
-Python 3.10 ou plus, et une clé API Anthropic.
+Python 3.10 ou plus, clé API Anthropic. Dans le dossier de ton projet :
 
 ```bash
-pip install -e .
+pip install -e .   # depuis le dépôt Maïeutik
 export ANTHROPIC_API_KEY=...
-maieutik init mon-projet     # prépare le projet fil rouge
 cd mon-projet
-maieutik chat                # lance une session avec le professeur
+maieutik chat
 ```
 
-Dans la session :
+Pour un projet d'exercice vierge : `maieutik init mon-projet`.
 
 | Commande | Effet |
 |---|---|
-| `/indice` | demande le barreau d'aide suivant |
-| `/tests` | lance les tests et t'aide à comprendre les échecs |
-| `/relis` | relecture pédagogique de ton code |
+| `/audit` | relecture de sécurité de ton projet |
 | `/explique [sujet]` | explique le pourquoi d'un choix |
-| `/progres` | affiche ta progression |
-| `/quit` | quitte |
+| `/tests` | lance les tests et aide à comprendre les échecs |
+| `/apprendre` / `/ensemble` | change de mode |
+| `/indice`, `/relis` | (mode apprendre) aide suivante, relecture pédagogique |
+| `/progres`, `/journal` | progression, journal des changements |
+| `/aide`, `/quit` | aide, quitter |
 
-Autres commandes : `maieutik progress [dossier]` affiche ta progression, `maieutik projects` liste les projets disponibles. Pour choisir un modèle : `maieutik chat --model <nom>` ou la variable `MAIEUTIK_MODEL`.
+Autres commandes : `maieutik progress [dossier]`, `maieutik journal [dossier]`, `maieutik projects`. Modèle : `--model <nom>` ou `MAIEUTIK_MODEL`.
+
+L'agent n'utilise que ses propres outils, confinés à ton dossier : lire, lister, chercher, écrire, modifier (avec le diff), lancer pytest ou un script Python. Les fichiers de secrets (`.env`, `*.pem`, `*.key`, clés SSH…) lui sont refusés, sauf les modèles comme `.env.example`. Les outils d'écriture n'existent qu'en mode coder ensemble.
 
 ## La méthode
 
-**L'échelle d'aide.** Quand tu bloques : 1) une question ou un indice, 2) un exemple partiel dans un autre contexte, 3) la solution expliquée, suivie d'un exercice de transfert. Si tu as vraiment essayé deux fois et que tu insistes, tu y accèdes sans attendre. Même là, la solution s'affiche dans la conversation : c'est toi qui la tapes.
-
-**Il vérifie avant d'affirmer.** Il exécute le code et les tests plutôt que de deviner.
-
-**Il se souvient.** `.maieutik/progress.json` (ignoré par git) contient ton niveau estimé, le jalon en cours, le statut de chaque concept (nouveau, en cours, fragile, acquis) et tes erreurs récurrentes. Les deux formes lisent et écrivent le même fichier : tu peux passer de l'une à l'autre.
-
-**Un projet fil rouge.** [`todo-api`](skills/maieutik/projects/todo-api/PROJECT.md) : une mini API de tâches en six jalons, avec les tests du jalon 1.
-
-La méthode complète est dans [`skills/maieutik/references/pedagogie.md`](skills/maieutik/references/pedagogie.md). Les principes derrière : [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md).
+La méthode complète est dans [`skills/maieutik/references/pedagogie.md`](skills/maieutik/references/pedagogie.md), les règles de sécurité dans [`references/securite.md`](skills/maieutik/references/securite.md). Principes : [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md).
 
 ## Suivre la progression sans agent
 
-Le script du skill fonctionne seul (Python 3.8 ou plus, aucune dépendance) :
+Script autonome (Python 3.8+, aucune dépendance) :
 
 ```bash
 python3 skills/maieutik/scripts/progress.py show
-python3 skills/maieutik/scripts/progress.py record "boucles for" solved --barreau 1
-python3 skills/maieutik/scripts/progress.py error "oublie le return"
-python3 skills/maieutik/scripts/progress.py profile --level débutant --milestone 2
+python3 skills/maieutik/scripts/progress.py record "authentification" seen
+python3 skills/maieutik/scripts/progress.py journal "Ajout de la connexion" --fichiers auth.py --pourquoi "hachage" --risque "clé dans .env"
 ```
 
 ## Structure du dépôt
@@ -125,41 +142,29 @@ python3 skills/maieutik/scripts/progress.py profile --level débutant --mileston
 ```text
 skills/maieutik/
 ├── SKILL.md                     # le skill
-├── references/pedagogie.md      # la méthode, partagée par les deux formes
-├── scripts/progress.py          # suivi de progression (copie de src/maieutik/progress.py)
-└── projects/todo-api/           # projet fil rouge : PROJECT.md et tests du jalon 1
-src/maieutik/
-├── cli.py                       # commandes init, chat, progress, projects
-├── agent.py                     # options du SDK et outils de l'agent en terminal
-├── progress.py                  # suivi de progression, sans dépendance
-├── tools.py                     # exécution de code et de tests, dépôt d'un défi
-├── prompts.py, prompts/         # prompt système = méthode du skill + outils du terminal
-└── skill.py                     # localise le dossier du skill
+├── references/pedagogie.md      # modes, format d'explication, échelle d'aide
+├── references/securite.md       # « À vérifier », niveaux de risque, audit
+├── scripts/progress.py          # copie générée de src/maieutik/progress.py
+└── projects/todo-api/           # projet d'exercice (repli)
+src/maieutik/                    # agent en terminal (cli, agent, tools, prompts, progress, skill)
 .claude-plugin/                  # manifestes du plugin Claude Code
 scripts/                         # install.sh, install.ps1, build_zips.py, sync_skill.py
-tests/                           # tests du dépôt
-docs/PHILOSOPHY.md
-AGENTS.md                        # consignes pour les agents qui modifient ce dépôt
+tests/  docs/PHILOSOPHY.md  AGENTS.md
 ```
 
 ## Développement
 
 ```bash
 pip install -e .
-python3 -m pytest                  # tests
+python3 -m pytest
 python3 scripts/sync_skill.py      # après toute modification de src/maieutik/progress.py
 python3 scripts/build_zips.py      # archive dans dist/
 ```
 
 ## Limites
 
-- Dans la forme skill, la règle « ne pas coder à ta place » repose sur la consigne donnée à l'agent. Pour une garantie technique, utilise `maieutik chat`.
-- Dans l'agent en terminal, `Read`, `Glob` et `Grep` ne sont pas confinés à ton dossier : il peut lire d'autres fichiers de ta machine. Seuls l'exécution de code et le dépôt de défis le sont.
-- Le code de l'élève s'exécute sur ta machine, sans isolation. Utilise-le pour ton propre code.
-- Les tests couvrent le skill, les outils, la progression, le CLI, les installateurs et la configuration de l'agent, pas les réponses du modèle ni l'activation du skill dans chaque application.
-
-## Pistes pour la suite
-
-- Autres projets fil rouge et autres langages.
-- Révisions espacées des concepts fragiles.
-- Interface web.
+- Ce n'est pas un audit (voir plus haut). L'IA explique son propre code : elle peut se tromper.
+- Dans la forme skill, le mode apprendre repose sur une consigne. Pour une garantie technique, utilise `maieutik chat`.
+- L'agent en terminal exécute seulement du Python (pytest, scripts `.py`). Pour d'autres langages, utilise le skill dans ton agent habituel.
+- Il peut écrire et exécuter du code dans ton dossier, sans isolation : travaille sous git pour pouvoir annuler.
+- Les tests couvrent le skill, les outils, la progression, le CLI, les installateurs et la configuration de l'agent, pas les réponses du modèle, l'activation du skill dans chaque application ni le script PowerShell.

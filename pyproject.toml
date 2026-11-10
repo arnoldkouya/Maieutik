@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "maieutik"
-version = "0.1.0"
-description = "Un agent professeur qui t'apprend à coder en codant avec toi, sans coder à ta place."
+version = "0.2.0"
+description = "Un agent qui code avec toi et t'explique chaque modification, en rendant les risques de sécurité visibles."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

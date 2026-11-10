@@ -14,19 +14,42 @@ from .skill import skill_dir
 DEFAULT_PROJECT = "todo-api"
 START_PROMPT = "[DÉBUT DE SESSION] Applique la procédure de début de session."
 
-CHAT_HELP = """Commandes :
-  /indice           demander le barreau d'aide suivant
-  /tests            lancer les tests et comprendre les échecs
-  /relis            relecture pédagogique de ton code
+CHAT_HELP = """Tu demandes, je code et je t'explique chaque modification.
+Exemple : « ajoute la connexion utilisateur ».
+
+Commandes :
+  /audit            relecture de sécurité de ton projet
   /explique [sujet] comprendre le pourquoi d'un choix
+  /tests            lancer les tests et comprendre les échecs
+  /apprendre        passer en mode apprendre : tu codes, je te guide (je ne touche à rien)
+  /ensemble         revenir au mode coder ensemble (par défaut)
+  /indice           (mode apprendre) demander le barreau d'aide suivant
+  /relis            (mode apprendre) relecture pédagogique de ton code
   /progres          voir ta progression
+  /journal          voir le journal des changements
   /aide             afficher cette aide
   /quit             quitter"""
 
 SLASH_PROMPTS = {
     "/indice": "[INDICE] Je suis bloqué. Donne-moi l'aide du barreau suivant de l'échelle, pas plus.",
-    "/tests": "[TESTS] Lance les tests, puis aide-moi à comprendre les échecs sans me donner la solution.",
+    "/tests": "[TESTS] Lance les tests, puis aide-moi à comprendre les échecs.",
     "/relis": "[RELECTURE] Relis mon code actuel comme un mentor.",
+    "/audit": (
+        "[AUDIT] Fais une relecture de sécurité de mon projet avec les règles de la section "
+        "Sécurité : rapport court classé en trois niveaux, expliqué simplement, "
+        "en précisant ce que tu n'as pas pu vérifier."
+    ),
+}
+
+MODE_MESSAGES = {
+    "apprendre": (
+        "[MODE APPRENDRE] À partir de maintenant je code moi-même : guide-moi avec l'échelle d'aide "
+        "et ne modifie aucun fichier."
+    ),
+    "ensemble": (
+        "[MODE ENSEMBLE] Reviens au mode coder ensemble : tu codes à ma demande et tu expliques "
+        "chaque modification."
+    ),
 }
 
 
@@ -61,6 +84,13 @@ def init_workspace(target: Path, project: str = DEFAULT_PROJECT) -> list[Path]:
     return created
 
 
+def read_journal(workspace: Path) -> str:
+    path = prog.journal_path(workspace)
+    if not path.is_file():
+        return "Journal vide : il se remplit à chaque modification de code."
+    return path.read_text(encoding="utf-8").strip()
+
+
 def translate_input(line: str) -> str:
     """Transforme une commande /… en message explicite pour l'agent."""
     stripped = line.strip()
@@ -82,7 +112,9 @@ async def _show_response(client) -> None:
                 if isinstance(block, TextBlock) and block.text.strip():
                     print(f"\n{block.text.strip()}")
                 elif isinstance(block, ToolUseBlock):
-                    print(f"  · {block.name.removeprefix('mcp__maieutik__')}")
+                    target = (getattr(block, "input", None) or {}).get("path", "")
+                    label = block.name.removeprefix("mcp__maieutik__")
+                    print(f"  · {label} {target}".rstrip())
         elif isinstance(message, ResultMessage) and message.is_error:
             print(f"\n[erreur] {message.result or message.subtype}")
 
@@ -90,9 +122,10 @@ async def _show_response(client) -> None:
 async def chat(workspace: Path, model: str | None = None) -> int:
     from claude_agent_sdk import ClaudeSDKClient
 
-    from .agent import build_options
+    from .agent import SessionState, build_options
 
-    options = build_options(workspace, model=model)
+    state = SessionState()
+    options = build_options(workspace, model=model, state=state)
     print(f"Maïeutik : session dans {workspace}\n{CHAT_HELP}\n")
     try:
         async with ClaudeSDKClient(options=options) as client:
@@ -113,6 +146,16 @@ async def chat(workspace: Path, model: str | None = None) -> int:
                     continue
                 if line == "/progres":
                     print(prog.summary(prog.load(workspace)))
+                    continue
+                if line == "/journal":
+                    print(read_journal(workspace))
+                    continue
+                if line in ("/apprendre", "/ensemble"):
+                    mode = line[1:]
+                    state.set_mode(mode)
+                    print(f"Mode : {mode}")
+                    await client.query(MODE_MESSAGES[mode])
+                    await _show_response(client)
                     continue
                 await client.query(translate_input(line))
                 await _show_response(client)
@@ -146,6 +189,9 @@ def main(argv: list[str] | None = None) -> int:
     progress_cmd = commands.add_parser("progress", help="affiche ta progression")
     progress_cmd.add_argument("directory", nargs="?", default=".")
 
+    journal_cmd = commands.add_parser("journal", help="affiche le journal des changements")
+    journal_cmd.add_argument("directory", nargs="?", default=".")
+
     commands.add_parser("projects", help="liste les projets fil rouge disponibles")
 
     args = parser.parse_args(argv)
@@ -169,6 +215,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "progress":
         print(prog.summary(prog.load(directory)))
+        return 0
+
+    if args.command == "journal":
+        print(read_journal(directory))
         return 0
 
     try:
